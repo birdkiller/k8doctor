@@ -12,9 +12,9 @@ RUN apk add --no-cache git ca-certificates
 WORKDIR /build
 
 # 复制 go mod 文件
-COPY go.mod go.sum ./
+COPY go.mod ./
 
-# 下载依赖（利用 Docker 缓存）
+# 下载依赖（go mod download 会自动生成 go.sum）
 RUN go mod download
 
 # 复制源代码
@@ -34,10 +34,12 @@ FROM python:3.12-slim AS model-downloader
 
 WORKDIR /download
 
-COPY scripts/download_model.py .
+# 安装依赖
+RUN pip install --no-cache-dir numpy onnxruntime
 
-RUN pip install --no-cache-dir numpy onnxruntime && \
-    python download_model.py
+# 下载模型（如果失败不影响构建）
+COPY scripts/download_model.py .
+RUN python download_model.py || echo "ONNX model download failed, will use TF-IDF fallback"
 
 # ============================================================
 # Stage 3: 运行镜像
@@ -55,17 +57,20 @@ RUN apk add --no-cache \
 # 创建工作目录
 WORKDIR /app
 
+# 创建必要的目录
+RUN mkdir -p /app/kb /app/embeddings/models /app/scripts
+
 # 从 builder 复制二进制文件
 COPY --from=builder /build/k8doctor /app/k8doctor
 
 # 复制知识库
-COPY --from=builder /build/kb /app/kb
+COPY --from=builder /build/kb/ /app/kb/
 
 # 复制脚本（包含 ONNX 推理脚本）
-COPY --from=builder /build/scripts /app/scripts
+COPY --from=builder /build/scripts/ /app/scripts/
 
-# 复制 ONNX 模型（如果有）
-COPY --from=model-downloader /download/embeddings/models/*.onnx /app/embeddings/models/ 2>/dev/null || true
+# 复制 ONNX 模型（如果有），不存在也继续
+COPY --from=model-downloader /download/embeddings/models/ /app/embeddings/models/ 2>/dev/null || true
 
 # 设置环境变量
 ENV K8DOCTOR_KB_PATH=/app/kb
