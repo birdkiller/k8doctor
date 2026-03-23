@@ -6,7 +6,7 @@
 # ============================================================
 FROM golang:1.22 AS builder
 
-# 安装构建依赖 (Debian base)
+# 安装构建依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ca-certificates \
@@ -46,14 +46,14 @@ RUN python download_model.py || echo "ONNX model download failed, will use TF-ID
 # ============================================================
 # Stage 3: 运行镜像
 # ============================================================
-FROM alpine:3.19 AS runtime
+FROM debian:bookworm-slim AS runtime
 
 # 安装运行时依赖
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     bash \
     curl \
-    && rm -rf /var/cache/apk/*
+    && rm -rf /var/lib/apt/lists/*
 
 # 创建工作目录
 WORKDIR /app
