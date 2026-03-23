@@ -6,6 +6,9 @@
 # ============================================================
 FROM golang:1.22 AS builder
 
+# 更换为国内镜像源
+RUN sed -i 's|http://archive.ubuntu.com|http://://mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || true
+
 # 安装构建依赖
 RUN apt-get update && apt-get install -y \
     git \
@@ -34,6 +37,9 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 # ============================================================
 FROM ubuntu:22.04 AS model-downloader
 
+# 更换为国内镜像源
+RUN sed -i 's|http://archive.ubuntu.com|http://mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || true
+
 WORKDIR /download
 
 # 安装 Python 依赖
@@ -41,7 +47,7 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --no-cache-dir numpy onnxruntime
+RUN pip3 install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple numpy onnxruntime
 
 # 下载模型（如果失败不影响构建）
 COPY scripts/download_model.py .
@@ -51,6 +57,9 @@ RUN python3 download_model.py || echo "ONNX model download failed, will use TF-I
 # Stage 3: 运行镜像
 # ============================================================
 FROM ubuntu:22.04 AS runtime
+
+# 更换为国内镜像源
+RUN sed -i 's|http://archive.ubuntu.com|http://mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || true
 
 # 安装运行时依赖
 RUN apt-get update && apt-get install -y \
