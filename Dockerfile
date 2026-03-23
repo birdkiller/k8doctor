@@ -4,24 +4,26 @@
 # ============================================================
 # Stage 1: Builder
 # ============================================================
-FROM golang:1.22-alpine AS builder
+FROM golang:1.22 AS builder
 
-# 安装构建依赖
-RUN apk add --no-cache git ca-certificates
+# 安装构建依赖 (Debian base)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 
 # 复制 go mod 文件
 COPY go.mod ./
 
-# 下载依赖（go mod download 会自动生成 go.sum）
+# 下载依赖
 RUN go mod download
 
 # 复制源代码
 COPY . .
 
 # 构建二进制文件
-# CGO_ENABLED=0 是因为我们使用纯 Go 构建，不需要 cgo
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     go build -ldflags="-w -s" \
     -o k8doctor \
@@ -30,11 +32,11 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 # ============================================================
 # Stage 2: ONNX 模型下载器 (可选)
 # ============================================================
-FROM python:3.12-slim AS model-downloader
+FROM python:3.12 AS model-downloader
 
 WORKDIR /download
 
-# 安装依赖
+# 安装 Python 依赖
 RUN pip install --no-cache-dir numpy onnxruntime
 
 # 下载模型（如果失败不影响构建）
@@ -51,8 +53,8 @@ RUN apk add --no-cache \
     ca-certificates \
     bash \
     curl \
-    kubectl \
-    && update-ca-certificates
+    wget \
+    kubectl
 
 # 创建工作目录
 WORKDIR /app
@@ -66,10 +68,10 @@ COPY --from=builder /build/k8doctor /app/k8doctor
 # 复制知识库
 COPY --from=builder /build/kb/ /app/kb/
 
-# 复制脚本（包含 ONNX 推理脚本）
+# 复制脚本
 COPY --from=builder /build/scripts/ /app/scripts/
 
-# 复制 ONNX 模型（如果有），不存在也继续
+# 复制 ONNX 模型（如果有）
 COPY --from=model-downloader /download/embeddings/models/ /app/embeddings/models/ 2>/dev/null || true
 
 # 设置环境变量
@@ -77,7 +79,7 @@ ENV K8DOCTOR_KB_PATH=/app/kb
 ENV K8DOCTOR_EMBEDDINGS_PATH=/app/embeddings
 ENV PATH=/app:$PATH
 
-# 创建符号链接，方便使用
+# 创建符号链接
 RUN chmod +x /app/k8doctor && \
     ln -sf /app/k8doctor /usr/local/bin/k8doctor
 
