@@ -1,0 +1,46 @@
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+k8doctor
+k8doctor.exe
+
+# Go
+go-cache/
+go-mod-cache/
+go.sum
+
+# Build
+*.o
+*.a
+*.so
+_testmain.go
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temp
+tmp/
+temp/
+*.tmp
+
+# Docker
+.dockerignore
+
+# Embeddings (large files, downloaded at runtime)
+embeddings/models/*.onnx
+
+# Local config
+.env
+.env.local

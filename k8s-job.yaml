@@ -1,0 +1,77 @@
+# K8s Doctor - 一次性诊断 Job
+# 用于执行单次诊断任务
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: k8doctor
+  namespace: k8doctor
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: k8doctor-reader
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "services", "endpoints", "nodes", "events", "namespaces"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: k8doctor-reader-binding
+subjects:
+  - kind: ServiceAccount
+    name: k8doctor
+    namespace: k8doctor
+roleRef:
+  kind: ClusterRole
+  name: k8doctor-reader
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: k8doctor-diagnose
+  namespace: k8doctor
+spec:
+  ttlSecondsAfterFinished: 300  # 完成后5分钟自动清理
+  backoffLimit: 0  # 不重试
+  template:
+    spec:
+      serviceAccountName: k8doctor
+      restartPolicy: Never
+      containers:
+        - name: k8doctor
+          image: k8doctor:latest
+          imagePullPolicy: IfNotPresent
+          
+          # 诊断症状通过环境变量传入
+          env:
+            - name: DIAGNOSE_SYMPTOM
+              value: "Pod一直重启，日志报OOM"
+          
+          # 非交互模式，直接诊断指定症状
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "诊断症状: $DIAGNOSE_SYMPTOM"
+              echo "================================"
+              /app/k8doctor diagnose "$DIAGNOSE_SYMPTOM"
+              echo "================================"
+              echo "诊断完成"
+          
+          resources:
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
