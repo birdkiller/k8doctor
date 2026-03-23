@@ -7,7 +7,7 @@
 FROM golang:1.22 AS builder
 
 # 安装构建依赖
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y \
     git \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -32,24 +32,28 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 # ============================================================
 # Stage 2: ONNX 模型下载器 (可选)
 # ============================================================
-FROM python:3.12 AS model-downloader
+FROM ubuntu:22.04 AS model-downloader
 
 WORKDIR /download
 
 # 安装 Python 依赖
-RUN pip install --no-cache-dir numpy onnxruntime
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --no-cache-dir numpy onnxruntime
 
 # 下载模型（如果失败不影响构建）
 COPY scripts/download_model.py .
-RUN python download_model.py || echo "ONNX model download failed, will use TF-IDF fallback"
+RUN python3 download_model.py || echo "ONNX model download failed, will use TF-IDF fallback"
 
 # ============================================================
 # Stage 3: 运行镜像
 # ============================================================
-FROM debian:bookworm-slim AS runtime
+FROM ubuntu:22.04 AS runtime
 
 # 安装运行时依赖
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y \
     ca-certificates \
     bash \
     curl \
