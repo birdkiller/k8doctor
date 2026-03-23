@@ -54,7 +54,11 @@ RUN apk add --no-cache \
     bash \
     curl \
     wget \
-    kubectl
+    && rm -rf /var/cache/apk/*
+
+# 安装 kubectl（从官方二进制下载）
+RUN wget -q -O /usr/local/bin/kubectl https://dl.k8s.io/release/v1.28.0/bin/linux/amd64/kubectl \
+    && chmod +x /usr/local/bin/kubectl
 
 # 创建工作目录
 WORKDIR /app
